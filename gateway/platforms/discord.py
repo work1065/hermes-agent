@@ -4191,8 +4191,13 @@ class DiscordAdapter(BasePlatformAdapter):
                                 await thread.send(_deny_msg)
                             except Exception:
                                 pass
-                            # Unmark the thread so it doesn't bypass mention checks
-                            self._threads.unmark(thread_id)
+                            # Remove thread from participation tracker so subsequent
+                            # messages require @mention again (denied session shouldn't
+                            # get free-response treatment).
+                            try:
+                                self._threads._tracked.discard(thread_id)
+                            except (AttributeError, TypeError):
+                                pass
                             return  # Stop processing — session denied
 
         # Determine message type

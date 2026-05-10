@@ -13203,7 +13203,8 @@ class GatewayRunner:
         _daimon_overrides = None
         try:
             from gateway.daimon.gateway_hooks import get_agent_overrides, apply_overrides, setup_tool_gate, teardown_tool_gate, redact_output
-            _daimon_overrides = get_agent_overrides(user_config, source.user_id, platform_key)
+            if source.user_id:
+                _daimon_overrides = get_agent_overrides(user_config, source.user_id, platform_key)
         except ImportError:
             pass
         except Exception as _daimon_err:
