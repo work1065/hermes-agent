@@ -47,21 +47,29 @@ RUN git config --system user.name "daimon[bot]" \
     && git config --system credential.helper daimon \
     && git config --system init.defaultBranch main
 
-# Build credential server
+# Build credential server (root-only daemon, reads token, serves via socket)
 COPY credential-server.c /tmp/credential-server.c
 RUN gcc -O2 -Wall -o /usr/local/bin/credential-server /tmp/credential-server.c \
     && rm /tmp/credential-server.c
 
-# Install credential helper client
+# Install credential helper client (root-only — agent user cannot execute it)
 COPY git-credential-daimon /usr/local/bin/git-credential-daimon
-RUN chmod 755 /usr/local/bin/git-credential-daimon
+RUN chmod 700 /usr/local/bin/git-credential-daimon
 
-# gh CLI wrapper — fetches token from credential server per-invocation
-# so the token never persists in environment variables.
-COPY gh-wrapper.sh /usr/local/bin/gh-wrapper
-RUN chmod 755 /usr/local/bin/gh-wrapper \
+# gh-broker: allowlisted GitHub operations broker.
+# The agent calls 'gh' which is actually the broker — it validates the
+# subcommand against an allowlist, fetches the token from the credential
+# server socket INTERNALLY, runs the real gh binary in a subprocess,
+# and returns only the output. The agent never sees the raw token.
+COPY gh-broker.py /usr/local/bin/gh-broker
+RUN chmod 755 /usr/local/bin/gh-broker \
     && mv /usr/bin/gh /usr/bin/gh-real \
-    && ln -s /usr/local/bin/gh-wrapper /usr/bin/gh
+    && ln -s /usr/local/bin/gh-broker /usr/bin/gh
+
+# Remove the credential helper from git config — agent should NOT
+# be able to call 'git credential fill' to extract the token.
+# The broker handles auth internally.
+RUN git config --system --unset credential.helper || true
 
 # Default working directory
 WORKDIR /workspaces

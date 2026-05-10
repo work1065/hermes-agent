@@ -11,7 +11,7 @@ if [ -f /run/secrets/gh_token ]; then
     fi
 fi
 
-# Start credential server if binary exists (added in Task 13)
+# Start credential server if binary exists
 if [ -x /usr/local/bin/credential-server ]; then
     /usr/local/bin/credential-server /run/secrets/gh_token /run/git-credentials.sock &
     # Wait for socket
@@ -19,7 +19,11 @@ if [ -x /usr/local/bin/credential-server ]; then
         [ -S /run/git-credentials.sock ] && break
         sleep 0.1
     done
-    # Make socket accessible to agent user
+    # Socket permissions: accessible by agent so the broker can use it.
+    # The socket protocol only serves github.com tokens.
+    # The git credential helper is NOT installed for agent (chmod 700),
+    # and git config credential.helper is unset.
+    # The broker validates commands against an allowlist before using the token.
     if [ -S /run/git-credentials.sock ]; then
         chmod 666 /run/git-credentials.sock
     fi
